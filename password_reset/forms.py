@@ -1,9 +1,9 @@
+
 from django import forms
 from django.core.validators import validate_email
 from django.db.models import Q
 from django.utils.translation import ugettext_lazy as _
-
-from .utils import get_user_model
+from django.contrib.auth.models import User
 
 
 class PasswordRecoveryForm(forms.Form):
@@ -14,19 +14,15 @@ class PasswordRecoveryForm(forms.Form):
         search_fields = kwargs.pop('search_fields', ('username', 'email'))
         super(PasswordRecoveryForm, self).__init__(*args, **kwargs)
 
-        message = ("No other fields than username and email are supported "
-                   "by default")
+        message = ("No other fields than username and email are supported by default")
         if len(search_fields) not in (1, 2):
             raise ValueError(message)
         for field in search_fields:
             if field not in ['username', 'email']:
                 raise ValueError(message)
 
-        labels = {
-            'username': _('Username'),
-            'email': _('Email'),
-            'both': _('Username or Email'),
-        }
+        labels = {'username': _('Username'), 'email': _('Email'),
+				'both': _('Username or Email')}
         if len(search_fields) == 1:
             self.label_key = search_fields[0]
         else:
@@ -41,7 +37,6 @@ class PasswordRecoveryForm(forms.Form):
 
     def get_user_by_username(self, username):
         key = 'username__%sexact' % ('' if self.case_sensitive else 'i')
-        User = get_user_model()
         try:
             user = User.objects.get(**{key: username})
         except User.DoesNotExist:
@@ -51,7 +46,6 @@ class PasswordRecoveryForm(forms.Form):
     def get_user_by_email(self, email):
         validate_email(email)
         key = 'email__%sexact' % ('' if self.case_sensitive else 'i')
-        User = get_user_model()
         try:
             user = User.objects.get(**{key: email})
         except User.DoesNotExist:
@@ -63,7 +57,6 @@ class PasswordRecoveryForm(forms.Form):
         key = key % '' if self.case_sensitive else key % 'i'
         f = lambda field: Q(**{field + key: username})
         filters = f('username') | f('email')
-        User = get_user_model()
         try:
             user = User.objects.get(filters)
         except User.DoesNotExist:
@@ -74,14 +67,8 @@ class PasswordRecoveryForm(forms.Form):
 
 
 class PasswordResetForm(forms.Form):
-    password1 = forms.CharField(
-        label=_('New password'),
-        widget=forms.PasswordInput,
-    )
-    password2 = forms.CharField(
-        label=_('New password (confirm)'),
-        widget=forms.PasswordInput,
-    )
+    password1 = forms.CharField(label=_('New password'), widget=forms.PasswordInput)
+    password2 = forms.CharField(label=_('New password (confirm)'), widget=forms.PasswordInput)
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user')
@@ -96,6 +83,5 @@ class PasswordResetForm(forms.Form):
 
     def save(self):
         self.user.set_password(self.cleaned_data['password1'])
-        get_user_model().objects.filter(pk=self.user.pk).update(
-            password=self.user.password,
-        )
+
+        User.objects.filter(pk=self.user.pk).update(password=self.user.password)

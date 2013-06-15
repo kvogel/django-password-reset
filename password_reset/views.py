@@ -2,6 +2,7 @@ import datetime
 
 from django.conf import settings
 from django.contrib.sites.models import RequestSite
+from django.contrib.auth.models import User
 from django.core import signing
 from django.core.mail import send_mail
 from django.core.urlresolvers import reverse, reverse_lazy
@@ -12,7 +13,6 @@ from django.utils import timezone
 from django.views import generic
 
 from .forms import PasswordRecoveryForm, PasswordResetForm
-from .utils import get_user_model
 
 
 class SaltMixin(object):
@@ -76,20 +76,15 @@ class Recover(SaltMixin, generic.FormView):
             'token': signing.dumps(self.user.pk, salt=self.salt),
             'secure': self.request.is_secure(),
         }
-        body = loader.render_to_string(self.email_template_name,
-                                       context).strip()
+        body = loader.render_to_string(self.email_template_name, context).strip()
         subject = loader.render_to_string(self.email_subject_template_name,
                                           context).strip()
-        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL,
-                  [self.user.email])
+        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [self.user.email])
 
     def form_valid(self, form):
         self.user = form.cleaned_data['user']
         self.send_notification()
-        if (
-            len(self.search_fields) == 1 and
-            self.search_fields[0] == 'username'
-        ):
+        if len(self.search_fields) == 1 and self.search_fields[0] == 'username':
             # if we only search by username, don't disclose the user email
             # since it may now be public information.
             email = self.user.username
@@ -117,7 +112,7 @@ class Reset(SaltMixin, generic.FormView):
         except signing.BadSignature:
             return self.invalid()
 
-        self.user = get_object_or_404(get_user_model(), pk=pk)
+        self.user = get_object_or_404(User, pk=pk)
         return super(Reset, self).dispatch(request, *args, **kwargs)
 
     def invalid(self):
